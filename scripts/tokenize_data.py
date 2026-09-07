@@ -19,7 +19,7 @@ def main():
 
     print(f"Characters in corpus: {len(text)}")
     print(f"Vocabulary size: {len(tokenizer.chars)}")
-    print(f"Total tokens: {len(tokens)}")
+    print(f"Total tokens: {len(tokens)}"),
     print(f"Tokens written to: {TOKENS_FILE}")
 
     decoded_preview = tokenizer.decode(tokens[:500])
