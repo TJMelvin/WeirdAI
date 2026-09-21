@@ -110,7 +110,7 @@ class CausalAttention(nn.Module):
 
         # 3. Mask future tokens.
         attention_scores = attention_scores.masked_fill(
-        self.mask.bool(),
+        self.mask[:attention_scores.size(1), :attention_scores.size(2)].bool(),
         float("-inf")
     )
 

@@ -21,17 +21,17 @@ def calc_loss_batch(input_batch, target_batch, model, device):
     Returns:
         A scalar loss tensor.
     """
-
-    # TODO:
-    # 1. Move input_batch and target_batch to the selected device.
-    # 2. Run input_batch through the model to get logits.
-    # 3. Reshape logits so cross_entropy sees:
-    #       (batch_size * num_tokens, vocab_size)
-    # 4. Reshape targets so cross_entropy sees:
-    #       (batch_size * num_tokens)
-    # 5. Return cross-entropy loss.
-
-    raise NotImplementedError("Implement calc_loss_batch.")
+    input_batch = input_batch.to(device)
+    target_batch = target_batch.to(device)
+    
+    logits = model(input_batch)
+    
+    logits = logits.reshape(-1, logits.size(-1))
+    target_batch = target_batch.reshape(-1)
+   
+    loss = F.cross_entropy(logits, target_batch)
+   
+    return loss
 
 
 def calc_loss_loader(data_loader, model, device, num_batches=None):
@@ -47,15 +47,28 @@ def calc_loss_loader(data_loader, model, device, num_batches=None):
     Returns:
         Average loss as a float.
     """
+    if len(data_loader) == 0:
+        return float("nan")
 
-    # TODO:
-    # 1. Handle an empty data loader.
-    # 2. Determine how many batches to evaluate.
-    # 3. Loop through the data loader.
-    # 4. Calculate loss for each batch.
-    # 5. Return the average loss.
+    total_loss = 0.0
+    batch_count = 0
 
-    raise NotImplementedError("Implement calc_loss_loader.")
+    for input_batch, target_batch in data_loader:
+
+        loss = calc_loss_batch(
+            input_batch,
+            target_batch,
+            model,
+            device
+        )
+
+        total_loss += loss.item()
+        batch_count += 1
+
+        if num_batches is not None and batch_count >= num_batches:
+            break
+
+    return total_loss / batch_count
 
 
 def calculate_perplexity(loss):
@@ -68,8 +81,4 @@ def calculate_perplexity(loss):
     Returns:
         Perplexity value.
     """
-
-    # TODO:
-    # Perplexity is exp(loss).
-
-    raise NotImplementedError("Implement calculate_perplexity.")
+    return torch.exp(torch.as_tensor(loss))
