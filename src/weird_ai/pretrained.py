@@ -47,14 +47,19 @@ def get_device(preferred_device: str | None = None) -> torch.device:
     Returns:
         A torch.device object.
     """
+    if preferred_device is not None:
+        return torch.device(preferred_device)
 
-    # TODO:
-    # 1. If preferred_device is provided, return torch.device(preferred_device).
-    # 2. If CUDA is available, return a CUDA device.
-    # 3. If Apple Silicon MPS is available, return an MPS device.
-    # 4. Otherwise, return a CPU device.
+    if torch.cuda.is_available():
+        return torch.device("cuda")
 
-    raise NotImplementedError("Implement get_device.")
+    if (
+        hasattr(torch.backends, "mps")
+        and torch.backends.mps.is_available()
+    ):
+        return torch.device("mps")
+
+    return torch.device("cpu")
 
 
 def load_tokenizer(model_name: str = DEFAULT_MODEL_NAME) -> Any:
@@ -68,15 +73,17 @@ def load_tokenizer(model_name: str = DEFAULT_MODEL_NAME) -> Any:
         A tokenizer object loaded with AutoTokenizer.from_pretrained().
     """
 
-    # TODO:
-    # 1. Check that AutoTokenizer is available. If not, raise an ImportError
-    #    explaining that transformers must be installed.
-    # 2. Load the tokenizer with AutoTokenizer.from_pretrained(model_name).
-    # 3. Some causal language models do not define a padding token. If the
-    #    tokenizer has no pad_token, set tokenizer.pad_token to tokenizer.eos_token.
-    # 4. Return the tokenizer.
+    if AutoTokenizer is None:
+        raise ImportError(
+            "transformers must be installed to load a pretrained tokenizer."
+        )
 
-    raise NotImplementedError("Implement load_tokenizer.")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    return tokenizer
 
 
 def load_model(
@@ -94,16 +101,17 @@ def load_model(
         A model object in evaluation mode.
     """
 
-    # TODO:
-    # 1. Check that AutoModelForCausalLM is available. If not, raise an
-    #    ImportError explaining that transformers must be installed.
-    # 2. Resolve the device using get_device().
-    # 3. Load the model with AutoModelForCausalLM.from_pretrained(model_name).
-    # 4. Move the model to the selected device.
-    # 5. Put the model in evaluation mode with model.eval().
-    # 6. Return the model.
+    if AutoModelForCausalLM is None:
+        raise ImportError(
+            "transformers must be installed to load a pretrained model."
+        )
 
-    raise NotImplementedError("Implement load_model.")
+    selected_device = get_device(device)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    model = model.to(selected_device)
+    model.eval()
+
+    return model
 
 
 def tokenize_prompt(
@@ -123,12 +131,13 @@ def tokenize_prompt(
         A dictionary of input tensors that can be passed to model.generate().
     """
 
-    # TODO:
-    # 1. Tokenize the prompt using tokenizer(prompt, return_tensors="pt").
-    # 2. Move every tensor in the returned dictionary to the selected device.
-    # 3. Return the dictionary.
+    selected_device = get_device(device)
+    encoded = tokenizer(prompt, return_tensors="pt")
 
-    raise NotImplementedError("Implement tokenize_prompt.")
+    return {
+        key: value.to(selected_device)
+        for key, value in encoded.items()
+    }
 
 
 def decode_generated_tokens(
@@ -148,12 +157,15 @@ def decode_generated_tokens(
         The decoded text as a string.
     """
 
-    # TODO:
-    # 1. If generated_token_ids has a batch dimension, decode only the first row.
-    # 2. Use tokenizer.decode(..., skip_special_tokens=skip_special_tokens).
-    # 3. Return the decoded text.
+    if generated_token_ids.ndim > 1:
+        generated_token_ids = generated_token_ids[0]
 
-    raise NotImplementedError("Implement decode_generated_tokens.")
+    token_ids = generated_token_ids.tolist()
+
+    return tokenizer.decode(
+        token_ids,
+        skip_special_tokens=skip_special_tokens,
+    )
 
 
 def generate_text(
@@ -185,17 +197,36 @@ def generate_text(
         Generated text decoded into a string.
     """
 
-    # TODO:
-    # 1. Resolve the device with get_device().
-    # 2. If tokenizer is None, call load_tokenizer(model_name).
-    # 3. If model is None, call load_model(model_name, device=device).
-    # 4. Tokenize the prompt with tokenize_prompt().
-    # 5. Call model.generate() inside a torch.no_grad() block.
-    # 6. Pass max_new_tokens, temperature, top_k, do_sample, and pad_token_id.
-    # 7. Decode the generated token IDs with decode_generated_tokens().
-    # 8. Return the decoded generated text.
+    selected_device = get_device(device)
 
-    raise NotImplementedError("Implement generate_text.")
+    if tokenizer is None:
+        tokenizer = load_tokenizer(model_name)
+
+    if model is None:
+        model = load_model(model_name, device=selected_device)
+
+    inputs = tokenize_prompt(
+        tokenizer,
+        prompt,
+        device=selected_device,
+    )
+
+    pad_token_id = getattr(tokenizer, "pad_token_id", None)
+
+    if pad_token_id is None:
+        pad_token_id = getattr(tokenizer, "eos_token_id", None)
+
+    with torch.no_grad():
+        generated_token_ids = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            top_k=top_k,
+            do_sample=do_sample,
+            pad_token_id=pad_token_id,
+        )
+
+    return decode_generated_tokens(tokenizer, generated_token_ids)
 
 
 def generate_with_reasoning(
@@ -225,9 +256,15 @@ def generate_with_reasoning(
         Generated text from the reasoning-structured prompt.
     """
 
-    # TODO:
-    # 1. Use build_reasoning_prompt(user_prompt) to create a reasoning prompt.
-    # 2. Pass that reasoning prompt to generate_text().
-    # 3. Return the generated text.
+    reasoning_prompt = build_reasoning_prompt(user_prompt)
 
-    raise NotImplementedError("Implement generate_with_reasoning.")
+    return generate_text(
+        reasoning_prompt,
+        model=model,
+        tokenizer=tokenizer,
+        model_name=model_name,
+        max_new_tokens=max_new_tokens,
+        temperature=temperature,
+        top_k=top_k,
+        device=device,
+    )
