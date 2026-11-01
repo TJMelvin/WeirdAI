@@ -144,25 +144,6 @@ def evaluate_parody(text: str, target_line_count: int = 4) -> dict[str, Any]:
         scores, an overall score, and a simple pass/fail recommendation.
     """
 
-    # TODO:
-    # 1. Extract the final parody.
-    # 2. Normalize the lyrics.
-    # 3. Analyze the extracted parody using analyze_lyrics().
-    # 4. Calculate rhyme_score using calculate_rhyme_score().
-    # 5. Calculate structure_score using calculate_structure_score().
-    # 6. Calculate overall_score as the average of rhyme_score and structure_score.
-    # 7. Set passed to True when overall_score >= 0.60 and there is at least one lyric line.
-    # 8. Return a dictionary with these keys:
-    #       "extracted_text"
-    #       "lines"
-    #       "line_count"
-    #       "rhyme_scheme"
-    #       "syllable_counts"
-    #       "rhyme_score"
-    #       "structure_score"
-    #       "overall_score"
-    #       "passed"
-
     extracted_text = extract_final_parody(text)
     lines = normalize_lyrics(extracted_text)
     analysis = analyze_lyrics(extracted_text)
